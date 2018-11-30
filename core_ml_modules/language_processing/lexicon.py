@@ -62,9 +62,9 @@ class Lexicon:
         Sort word objects into dictionaries with appropriate keys
         """
         for word in self.all_words:
-            original_form = word.original_form
-            canonical_form = word.canonical_form
-            pos_tag = word.pos_tag
+            original_form = word.get_original_form()
+            canonical_form = word.get_canonical_form()
+            pos_tag = word.get_pos_tag()
 
             self._original_form_dict[original_form] = word
 
@@ -125,8 +125,9 @@ class Lexicon:
         :type detect_function: function((Lexicon, str) => bool)
         """
         for word in self.all_words:
-            if detect_function(self, word.original_form):
-                self._cluster_word(word.original_form, canonical_form)
+            original_form = word.get_original_form()
+            if detect_function(self, original_form):
+                self._cluster_word(original_form, canonical_form)
 
     def cluster(self, distance_function, threshold_function, filter_function=lambda lexicon: lexicon.all_words):
         """
@@ -145,12 +146,12 @@ class Lexicon:
         filtered_words = filter_function(self)
 
         for word in filtered_words:
-
+            original_form = word.get_original_form()
             minimum_distance = math.inf
             closest_canonical_form = None
 
             for canonical_form in self._canonical_form_dict.keys():
-                distance = distance_function(self, word.original_form, canonical_form, minimum_distance)
+                distance = distance_function(self, original_form, canonical_form, minimum_distance)
 
                 if distance < minimum_distance:
                     minimum_distance = distance
@@ -158,10 +159,10 @@ class Lexicon:
 
             # Successfully found canonical form that is sufficiently close to target word
             if (closest_canonical_form
-            and minimum_distance < threshold_function(self, word.original_form, closest_canonical_form, minimum_distance)):
+            and minimum_distance < threshold_function(self, original_form, closest_canonical_form, minimum_distance)):
 
-                self._cluster_word(word.original_form, closest_canonical_form)
+                self._cluster_word(original_form, closest_canonical_form)
 
             # Cannot find appropriate canonical form, so create a new cluster
             else:
-                self._cluster_word(word.original_form, word.original_form)
+                self._cluster_word(original_form, original_form)
