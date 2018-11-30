@@ -5,12 +5,21 @@ class Word:
     :type canonical_form: str
     :type pos_tag: str
     """
-    original_form = None
-    canonical_form = None
-    pos_tag = None
+    _original_form = None
+    _canonical_form = None
+    _pos_tag = None
 
     def __init__(self, original_form):
         self.original_form = original_form
+
+    def get_original_form(self):
+        return self.original_form
+
+    def get_canonical_form(self):
+        return self.canonical_form
+
+    def get_pos_tag(self):
+        return self.pos_tag
 
     def set_canonical_form(self, canonical_form):
         """
@@ -29,4 +38,3 @@ class Word:
             raise ValueError("Word is already has the canonical form {}".format(self.pos_tag))
 
         self.pos_tag = pos_tag
-

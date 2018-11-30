@@ -8,9 +8,9 @@ class Lexicon:
 
     :ivar all_words: a list of all words in the dataset as Word objects
     :type all_words: list(Word)
-    :ivar original_form_dict: dictionary where keys are the original forms as strings,
+    :ivar _original_form_dict: dictionary where keys are the original forms as strings,
                               and the values are the corresponding Word objects
-    :type original_form_dict: dict(str, Word)
+    :type _original_form_dict: dict(str, Word)
     :ivar original_form_dict: dictionary where keys are the canonical forms as strings,
                               and the values are lists of corresponding Word objects
     :type original_form_dict: dict(str, list(Word))
@@ -19,9 +19,9 @@ class Lexicon:
     :type original_form_dict: dict(str, list(Word))
     :ivar contexts: a list of context word windows which include the target words in the middle
     :type contexts: list(list(Word))
-    :ivar context_windows_dict: dictionary where keys are the original forms of the middle word as strings,
+    :ivar _context_windows_dict: dictionary where keys are the original forms of the middle word as strings,
                         and the values are lists of corresponding context Word windows
-    :type context_windows_dict: dict(str, list(list(Word)))
+    :type _context_windows_dict: dict(str, list(list(Word)))
     """
 
     def __init__(self, messages, extract_contexts_function):
@@ -33,30 +33,29 @@ class Lexicon:
                                           Target word must be in the center of each context window
         :type extract_contexts_function: function((Lexicon, list(list(str))) => list(list(str)))
         """
-        self.all_words = self._extract_words(messages)
+        self.all_words = []
+        self._extract_words(messages)
 
-        self.original_form_dict = {}
-        self.canonical_form_dict = {}
-        self.pos_tag_dict = {}
+        self._original_form_dict = {}
+        self._canonical_form_dict = {}
+        self._pos_tag_dict = {}
         self._sort_words_into_dicts()
 
-        self.context_windows = extract_contexts_function(self, messages)
-        self.context_windows_dict = {}
+        self.context_windows = []
+        extract_contexts_function(self, messages)
+
+        self._context_windows_dict = {}
         self._sort_contexts_into_dicts()
 
     def _extract_words(self, messages):
         """
         Extract all words as Words in messages
         :type messages: list(list(str))
-        :rtype: list(Word)
         """
-        words = []
         for message in messages:
             for word in message:
-                if word not in words:
-                    words.append(Word(word))
-
-        return words
+                if word not in self.all_words:
+                    self.all_words.append(Word(word))
 
     def _sort_words_into_dicts(self):
         """
@@ -67,17 +66,17 @@ class Lexicon:
             canonical_form = word.canonical_form
             pos_tag = word.pos_tag
 
-            self.original_form_dict[original_form] = word
+            self._original_form_dict[original_form] = word
 
             if canonical_form:
-                if canonical_form not in self.canonical_form_dict:
-                    self.canonical_form_dict[canonical_form] = []
-                self.canonical_form_dict[canonical_form].append(word)
+                if canonical_form not in self._canonical_form_dict:
+                    self._canonical_form_dict[canonical_form] = []
+                self._canonical_form_dict[canonical_form].append(word)
 
             if pos_tag:
-                if pos_tag not in self.pos_tag_dict:
-                    self.pos_tag_dict[pos_tag] = []
-                self.pos_tag_dict[pos_tag].append(word)
+                if pos_tag not in self._pos_tag_dict:
+                    self._pos_tag_dict[pos_tag] = []
+                self._pos_tag_dict[pos_tag].append(word)
 
     def _sort_contexts_into_dicts(self):
         """
@@ -90,18 +89,18 @@ class Lexicon:
 
             target_word = context[len(context) / 2]
 
-            if target_word not in self.context_windows_dict:
-                self.context_windows_dict[target_word] = []
-            self.context_windows_dict[target_word].append(context)
+            if target_word not in self._context_windows_dict:
+                self._context_windows_dict[target_word] = []
+            self._context_windows_dict[target_word].append(context)
 
     def get_word_by_original_form(self, original_form):
-        return self.original_form_dict[original_form]
+        return self._original_form_dict[original_form]
 
     def get_words_by_canonical_form(self, canonical_form):
-        return self.canonical_form_dict[canonical_form]
+        return self._canonical_form_dict[canonical_form]
 
     def get_words_by_pos_tag(self, pos_tag):
-        return self.pos_tag_dict[pos_tag]
+        return self._pos_tag_dict[pos_tag]
 
     def _cluster_word(self, original_form, canonical_form):
         """
@@ -112,10 +111,10 @@ class Lexicon:
         word_object = self.get_word_by_original_form(original_form)
         word_object.set_canonical_form(canonical_form)
 
-        if canonical_form not in self.canonical_form_dict:
-            self.canonical_form_dict[canonical_form] = [word_object]
+        if canonical_form not in self._canonical_form_dict:
+            self._canonical_form_dict[canonical_form] = [word_object]
         else:
-            self.canonical_form_dict[canonical_form].append(word_object)
+            self._canonical_form_dict[canonical_form].append(word_object)
 
     def add_cluster(self, canonical_form, detect_function):
         """
@@ -150,7 +149,7 @@ class Lexicon:
             minimum_distance = math.inf
             closest_canonical_form = None
 
-            for canonical_form in self.canonical_form_dict.keys():
+            for canonical_form in self._canonical_form_dict.keys():
                 distance = distance_function(self, word.original_form, canonical_form, minimum_distance)
 
                 if distance < minimum_distance:
