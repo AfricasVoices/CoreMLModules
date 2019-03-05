@@ -1,168 +1,159 @@
-import math
-
-from . import Word
-
 class Lexicon:
     """
     Object containing lexical information on all words in the dataset
-
-    :ivar all_words: a list of all words in the dataset as Word objects
-    :type all_words: list(Word)
-    :ivar original_form_dict: dictionary where keys are the original forms as strings,
-                              and the values are the corresponding Word objects
-    :type original_form_dict: dict(str, Word)
-    :ivar original_form_dict: dictionary where keys are the canonical forms as strings,
-                              and the values are lists of corresponding Word objects
-    :type original_form_dict: dict(str, list(Word))
-    :ivar original_form_dict: dictionary where keys are the part-of-speech tags as strings,
-                              and the values are lists of corresponding Word objects
-    :type original_form_dict: dict(str, list(Word))
-    :ivar contexts: a list of context word windows which include the target words in the middle
-    :type contexts: list(list(Word))
-    :ivar context_windows_dict: dictionary where keys are the original forms of the middle word as strings,
-                        and the values are lists of corresponding context Word windows
-    :type context_windows_dict: dict(str, list(list(Word)))
+    :ivar _all_words: a list of all words in the dataset as Word objects
+    :type _all_words: list(Word)
+    :ivar _features: dictionary of dictionaries where Words are sorted by linguistic features
+                     e.g. {
+                               "pos_tag": {
+                                   "noun": [Word("I"), Word("apples")],
+                                   "verb": [Word("eat")]
+                               },
+                               "original_str": {
+                                   "I": [Word("I")],
+                                   "eat": [Word("eat")],
+                                   "apples": [Word("apples")]
+                               }
+                           }
+    :type _features: dict[str, dict[str, list(str)]]
     """
 
-    def __init__(self, messages, extract_contexts_function):
+    class _Word:
         """
-        Initialises the lexicon
-        :param messages: a list of all messages
-        :type messages: list(list(str))
-        :param extract_contexts_function: Function that extracts contexts.
-                                          Target word must be in the center of each context window
-        :type extract_contexts_function: function((Lexicon, list(list(str))) => list(list(str)))
+        Word object containing its original form and messages which contain it, as well as any other defined linguistic features
+        :ivar _original_str: original form of the word
+        :type _original_str: str
+        :ivar _features: dictionary of the word's linguistic features and their values
+        :type _features: dict(str)
+        :ivar _messages: messages in which the word appears
+        :type _messages: list(list(str))
         """
-        self.all_words = self._extract_words(messages)
+        def __init__(self, original_str, features):
+            self._original_str = original_str
+            self._features = dict.fromkeys(features, None)
+            self._messages = []
 
-        self.original_form_dict = {}
-        self.canonical_form_dict = {}
-        self.pos_tag_dict = {}
-        self._sort_words_into_dicts()
+        def get_original_str(self):
+            return self._original_str
 
-        self.context_windows = extract_contexts_function(self, messages)
-        self.context_windows_dict = {}
-        self._sort_contexts_into_dicts()
+        def get_feature_value(self, feature):
+            return self._features[feature]
+
+        def set_feature_value(self, feature, value):
+            self._features[feature] = value
+
+        def get_messages(self):
+            return self._messages
+
+        def add_message(self, message):
+            self._messages.append(message)
+
+    def __init__(self, messages, features):
+        self._all_words = {}
+        self._features = dict.fromkeys(features, {})
+
+        self._extract_words(messages)
+
+    def __contains__(self, item):
+        return item in self._all_words
 
     def _extract_words(self, messages):
         """
-        Extract all words as Words in messages
+        Sorts words into a dictionary mapping original string to the corresponding Word object
+        :param messages: list of tokenised messages
         :type messages: list(list(str))
-        :rtype: list(Word)
         """
-        words = []
+        assert isinstance(messages, list), "Messages must be in a list of lists containing tokens"
+
         for message in messages:
+            assert isinstance(message, list), "Messages must be tokenised as a list of str"
+
             for word in message:
-                if word not in words:
-                    words.append(Word(word))
+                assert isinstance(word, str), "Words must be represented as str"
 
-        return words
+                if word not in self._all_words:
+                    self.add_word(word)
 
-    def _sort_words_into_dicts(self):
+                self._all_words[word].add_message(message)
+
+    def has_feature(self, feature):
+        return feature in self._features
+
+    def set_feature_value(self, original_str, feature, value):
         """
-        Sort word objects into dictionaries with appropriate keys
+        Sets the value of a feature for a particular word
+        :param feature: one of the features defined during init (e.g. "pos_tag")
+        :type feature: str
+        :param value: value of the feature (e.g. "noun")
+        :type value: str
         """
-        for word in self.all_words:
-            original_form = word.original_form
-            canonical_form = word.canonical_form
-            pos_tag = word.pos_tag
+        assert original_str in self._all_words, "Word '{}' not found in lexicon".format(original_str)
+        assert feature in self._features, "Invalid feature '{}'".format(feature)
 
-            self.original_form_dict[original_form] = word
+        self._all_words[original_str].set_feature_value(feature, value)
 
-            if canonical_form:
-                if canonical_form not in self.canonical_form_dict:
-                    self.canonical_form_dict[canonical_form] = []
-                self.canonical_form_dict[canonical_form].append(word)
+        if value not in self._features[feature]:
+            self._features[feature][value] = []
+        self._features[feature][value].append(original_str)
 
-            if pos_tag:
-                if pos_tag not in self.pos_tag_dict:
-                    self.pos_tag_dict[pos_tag] = []
-                self.pos_tag_dict[pos_tag].append(word)
-
-    def _sort_contexts_into_dicts(self):
+    def get_words_by_feature_value(self, feature, value):
         """
-        Sort context windows into dictionaries with target words as keys
+        Retrieves a list of possible words (in their original form) whose feature matches the provided value
+        >>> lexicon.get_words_by_feature_value("pos_tag", "noun")
+        ["apple", "orange", "cat", "dog"]
+
+        :param feature: one of the features defined during init (e.g. "pos_tag")
+        :type feature: str
+        :param value: value of the feature (e.g. "noun")
+        :type value: str
+        :rtype: str
         """
-        for context in self.context_windows:
-            if len(context) < 3 or len(context) % 2 == 0:
-                raise ValueError("Context windows must contain the target word as well as its neighbours, "
-                                 "so the context window size must be an odd number greater than 1")
+        assert feature in self._features, "Invalid feature '{}'".format(feature)
 
-            target_word = context[len(context) / 2]
+        if value not in self._features[feature]:
+            return []
 
-            if target_word not in self.context_windows_dict:
-                self.context_windows_dict[target_word] = []
-            self.context_windows_dict[target_word].append(context)
+        return self._features[feature][value]
 
-    def get_word_by_original_form(self, original_form):
-        return self.original_form_dict[original_form]
-
-    def get_words_by_canonical_form(self, canonical_form):
-        return self.canonical_form_dict[canonical_form]
-
-    def get_words_by_pos_tag(self, pos_tag):
-        return self.pos_tag_dict[pos_tag]
-
-    def _cluster_word(self, original_form, canonical_form):
+    def get_feature_value_by_word(self, original_str, feature):
         """
-        Assigns a canonical form to a word
-        :type original_form: str
-        :type canonical_form: str
+        Retrieves the value of a feature for a particular word
+        :param original_str: original form of the word
+        :type original_str: str
+        :param feature: one of the features defined during init (e.g. "pos_tag")
+        :type feature: str
+        :return: value of the feature
+        :rtype: str
         """
-        word_object = self.get_word_by_original_form(original_form)
-        word_object.set_canonical_form(canonical_form)
+        assert original_str in self._all_words, "Word '{}' not found in lexicon".format(original_str)
+        assert feature in self._features, "Invalid feature '{}'".format(feature)
 
-        if canonical_form not in self.canonical_form_dict:
-            self.canonical_form_dict[canonical_form] = [word_object]
-        else:
-            self.canonical_form_dict[canonical_form].append(word_object)
+        return self._all_words[original_str].get_feature_value(feature)
 
-    def add_cluster(self, canonical_form, detect_function):
+    def get_messages_by_word(self, original_str):
         """
-        Manually add a cluster which can be easily identified, e.g. with a regular expressions or a pre-defined list.
-        :param canonical_form: Head of the cluster to be formed
-        :type canonical_form: str
-        :param detect_function: Function to detect whether a word should be added to this cluster
-        :type detect_function: function((Lexicon, str) => bool)
+        Gets a list of all messages in which the provided word appears
         """
-        for word in self.all_words:
-            if detect_function(self, word.original_form):
-                self._cluster_word(word.original_form, canonical_form)
+        assert original_str in self._all_words, "Word '{}' not found in lexicon".format(original_str)
 
-    def cluster(self, distance_function, threshold_function, filter_function=lambda lexicon: lexicon.all_words):
+        return self._all_words[original_str].get_messages()
+
+    def add_message_to_word(self, original_str, message):
+        assert original_str in message, "Word '{}' not found in message '{}'".format(original_str, message)
+        assert original_str in self._all_words, "Word '{}' not found in lexicon".format(original_str)
+
+        self._all_words[original_str].add_message(message)
+
+    def add_word(self, original_str):
         """
-        Clusters words using the given distance function
-        :param distance_function: Computes distance between 2 words. Should return math.inf if exact distance has not
-                                  been computed but is too large for clustering.
-        :type distance_function: function((Lexicon, str, str, float) => float)
-        :param threshold_function: Computes an appropriate threshold given 2 words. Word will be clustered if
-                                   minimum distance is less than threshold.
-                                   Should return 0 if closest_canonical_form is None
-        :type threshold_function: function((Lexicon, str, str, float) => float)
-        :param filter_function: Filters words that should not be clustered, such as low frequency words or ones
-                                that can be clustered based on regular expressions (e.g. numbers).
-        :type filter_function: function(Lexicon => list(Word))
+        Adds a word not in the list of messages provided at init.
         """
-        filtered_words = filter_function(self)
+        assert original_str not in self._all_words, "Word '{}' already exists in lexicon".format(original_str)
 
-        for word in filtered_words:
+        self._all_words[original_str] = self._Word(original_str, self._features)
 
-            minimum_distance = math.inf
-            closest_canonical_form = None
+    def get_features(self):
+        return self._features.keys()
 
-            for canonical_form in self.canonical_form_dict.keys():
-                distance = distance_function(self, word.original_form, canonical_form, minimum_distance)
-
-                if distance < minimum_distance:
-                    minimum_distance = distance
-                    closest_canonical_form = canonical_form
-
-            # Successfully found canonical form that is sufficiently close to target word
-            if (closest_canonical_form
-            and minimum_distance < threshold_function(self, word.original_form, closest_canonical_form, minimum_distance)):
-
-                self._cluster_word(word.original_form, closest_canonical_form)
-
-            # Cannot find appropriate canonical form, so create a new cluster
-            else:
-                self._cluster_word(word.original_form, word.original_form)
+    def get_words(self):
+        return self._all_words.keys()
