@@ -49,6 +49,9 @@ class Lexicon:
             self._messages.append(message)
 
     def __init__(self, messages, features):
+        assert isinstance(messages, list), "Messages must be in a list of lists of str representing tokens"
+        assert isinstance(features, list), "Features must be in a list of str"
+
         self._all_words = {}
         self._features = dict.fromkeys(features, {})
 
@@ -63,8 +66,6 @@ class Lexicon:
         :param messages: list of tokenised messages
         :type messages: list(list(str))
         """
-        assert isinstance(messages, list), "Messages must be in a list of lists containing tokens"
-
         for message in messages:
             assert isinstance(message, list), "Messages must be tokenised as a list of str"
 
