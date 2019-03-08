@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 
 from core_ml_modules.language_processing import Lexicon
 
@@ -65,3 +66,33 @@ class TestLexicon(unittest.TestCase):
         )
         with self.assertRaises(AssertionError):
             lexicon.get_messages_by_word("They")    # Words in separately added messages are not automatically added to lexicon
+
+    def test_serialisation(self):
+        lexicon1 = Lexicon(MESSAGES, FEATURES)
+
+        with tempfile.TemporaryFile(mode='w+') as lexicon_file:
+            lexicon1.write_json(lexicon_file)
+            lexicon_file.seek(0)
+            lexicon2 = Lexicon.load_json(lexicon_file)
+
+        self.assertTrue(
+            lexicon1.get_words() == lexicon2.get_words()
+        )
+        self.assertTrue(
+            lexicon1.get_features() == lexicon2.get_features()
+        )
+
+        for word in lexicon1.get_words():
+            self.assertTrue(
+                lexicon1.get_messages_by_word(word) == lexicon2.get_messages_by_word(word)
+            )
+            for feature in lexicon1.get_features():
+                self.assertTrue(
+                    lexicon1.get_feature_value_by_word(word, feature) == lexicon2.get_feature_value_by_word(word, feature)
+                )
+
+                value = lexicon1.get_feature_value_by_word(word, feature)
+                self.assertTrue(
+                    lexicon1.get_words_by_feature_value(feature, value) == lexicon2.get_words_by_feature_value(feature, value)
+                )
+

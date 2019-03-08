@@ -1,3 +1,5 @@
+import json
+
 class Lexicon:
     """
     Object containing lexical information on all words in the dataset
@@ -47,6 +49,23 @@ class Lexicon:
 
         def add_message(self, message):
             self._messages.append(message)
+
+        def convert_to_dict(self):
+            dictionary = {}
+            dictionary["_original_str"] = self._original_str
+            dictionary["_features"] = self._features
+            dictionary["_messages"] = self._messages
+
+            return dictionary
+
+        @classmethod
+        def convert_from_dict(cls, dictionary):
+            word = cls("", [])
+            word._original_str = dictionary["_original_str"]
+            word._features = dictionary["_features"]
+            word._messages = dictionary["_messages"]
+
+            return word
 
     def __init__(self, messages, features):
         self._all_words = {}
@@ -157,3 +176,34 @@ class Lexicon:
 
     def get_words(self):
         return self._all_words.keys()
+
+    def convert_to_dict(self):
+        all_words_dicts = {}
+        for word in self._all_words:
+            all_words_dicts[word] = self._all_words[word].convert_to_dict()
+
+        dictionary = {}
+        dictionary["_all_words"] = all_words_dicts
+        dictionary["_features"] = self._features
+
+        return dictionary
+
+    def write_json(self, json_file):
+        json.dump(self.convert_to_dict(), json_file, indent=4)
+
+    @classmethod
+    def convert_from_dict(cls, dictionary):
+        all_words_objects = {}
+        for word in dictionary["_all_words"]:
+            all_words_objects[word] = cls._Word.convert_from_dict(dictionary["_all_words"][word])
+
+        lexicon = cls([[""]], [])
+        lexicon._all_words = all_words_objects
+        lexicon._features = dictionary["_features"]
+
+        return lexicon
+
+    @classmethod
+    def load_json(cls, json_file):
+        dictionary = json.load(json_file)
+        return Lexicon.convert_from_dict(dictionary)
