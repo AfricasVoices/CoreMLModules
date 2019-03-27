@@ -3,7 +3,9 @@ class Lexicon:
     Object containing lexical information on all words in the dataset
     :ivar _all_words: a list of all words in the dataset as Word objects
     :type _all_words: list(Word)
-    :ivar _features: dictionary of dictionaries where Words are sorted by linguistic features
+    :ivar _features: an index of linguistic features mapping onto words.
+                     One outer dictionary maps the type of linguistic feature (e.g. "pos_tag") to the relevant inner dictionary,
+                     and inner dictionaries map the feature value (e.g. "noun") to a list of Words that match the value
                      e.g. {
                                "pos_tag": {
                                    "noun": [Word("I"), Word("apples")],
@@ -28,7 +30,7 @@ class Lexicon:
         :ivar _messages: messages in which the word appears
         :type _messages: list(list(str))
         """
-        def __init__(self, original_str, features):
+        def __init__(self, original_str, features):     # _Word constructor
             self._original_str = original_str
             self._features = dict.fromkeys(features, None)
             self._messages = []
@@ -48,7 +50,7 @@ class Lexicon:
         def add_message(self, message):
             self._messages.append(message)
 
-    def __init__(self, messages, features):
+    def __init__(self, messages, features):       # Lexicon constructor
         assert isinstance(messages, list), "Messages must be in a list of lists of str representing tokens"
         assert isinstance(features, list), "Features must be in a list of str"
 
